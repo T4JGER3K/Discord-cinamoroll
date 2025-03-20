@@ -264,7 +264,7 @@ client.on('messageCreate', async (message) => {
     return;
   }
 
-  // Predefiniowane komendy !embed regulamin, !embed opis, !embed role
+  // Predefiniowane komendy – regulamin, opis, role
   if (message.content === '!embed regulamin') {
     if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator))
       return message.reply('Tylko administratorzy mogą używać tej komendy.');
@@ -303,7 +303,7 @@ client.on('messageCreate', async (message) => {
         }
       )
       .setFooter({ text: '© tajgerek' });
-    // Wysyłamy embed i dodajemy reakcję ✅ automatycznie
+    // Wysyłamy embed z reakcją ✅, która nada rolę
     const sentMessage = await message.channel.send({ embeds: [regulaminEmbed] });
     try {
       await sentMessage.react('✅');
@@ -371,9 +371,11 @@ client.on('messageCreate', async (message) => {
     return;
   }
 
-  // Ogólna komenda !embed dla niestandardowych embedów – nazwa podawana normalnie (bez cudzysłowów)
+  // Ogólna komenda !embed dla niestandardowych embedów – pomijamy predefiniowane nazwy
   if (message.content.startsWith('!embed')) {
     let args = message.content.slice('!embed'.length).trim();
+    // Jeśli użytkownik poda jedną z predefiniowanych nazw, pomijamy ten blok
+    if (['regulamin', 'opis', 'role'].includes(args.toLowerCase())) return;
     if (!args) return message.channel.send('Podaj nazwę embeda.');
     const embedName = args;
     db.get(
