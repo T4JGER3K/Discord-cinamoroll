@@ -27,36 +27,58 @@ const db = new sqlite3.Database('./logChannels.db', (err) => {
     console.error('Błąd połączenia z bazą danych:', err.message);
   } else {
     console.log('Połączono z bazą danych.');
+    initDatabase();
   }
 });
 
-// Aktualizacja schematu bazy – dodajemy kolumnę changeChannelId
-db.run(
-  `CREATE TABLE IF NOT EXISTS logChannels (
-    guildId TEXT PRIMARY KEY,
-    textChannelId TEXT,
-    editChannelId TEXT,
-    voiceChannelId TEXT,
-    changeChannelId TEXT
-  )`,
-  (err) => {
-    if (err) console.error('Błąd przy tworzeniu tabeli:', err.message);
-  }
-);
+// Funkcja migracyjna – sprawdzamy, czy istnieje kolumna changeChannelId
+function initDatabase() {
+  // Tworzymy tabelę logChannels jeśli nie istnieje
+  db.run(
+    `CREATE TABLE IF NOT EXISTS logChannels (
+      guildId TEXT PRIMARY KEY,
+      textChannelId TEXT,
+      editChannelId TEXT,
+      voiceChannelId TEXT
+    )`,
+    (err) => {
+      if (err) console.error('Błąd przy tworzeniu tabeli:', err.message);
+      else migrateLogChannels();
+    }
+  );
+  // Tworzymy tabelę customEmbeds
+  db.run(
+    `CREATE TABLE IF NOT EXISTS customEmbeds (
+      guildId TEXT,
+      embedName TEXT,
+      embedTitle TEXT,
+      embedContent TEXT,
+      PRIMARY KEY (guildId, embedName)
+    )`,
+    (err) => {
+      if (err) console.error('Błąd przy tworzeniu tabeli customEmbeds:', err.message);
+    }
+  );
+}
 
-// Tworzenie tabeli customEmbeds dla niestandardowych embedów (klucz: guildId + embedName)
-db.run(
-  `CREATE TABLE IF NOT EXISTS customEmbeds (
-    guildId TEXT,
-    embedName TEXT,
-    embedTitle TEXT,
-    embedContent TEXT,
-    PRIMARY KEY (guildId, embedName)
-  )`,
-  (err) => {
-    if (err) console.error('Błąd przy tworzeniu tabeli customEmbeds:', err.message);
-  }
-);
+// Sprawdzamy, czy tabela logChannels ma kolumnę changeChannelId, jeśli nie – dodajemy ją
+function migrateLogChannels() {
+  db.all(`PRAGMA table_info(logChannels)`, (err, rows) => {
+    if (err) {
+      console.error('Błąd przy pobieraniu informacji o tabeli:', err.message);
+      return;
+    }
+    const hasChangeColumn = rows.some(row => row.name === 'changeChannelId');
+    if (!hasChangeColumn) {
+      db.run(`ALTER TABLE logChannels ADD COLUMN changeChannelId TEXT`, (err) => {
+        if (err) console.error('Błąd przy migracji tabeli (dodawanie changeChannelId):', err.message);
+        else console.log('Migracja zakończona – kolumna changeChannelId została dodana.');
+      });
+    } else {
+      console.log('Migracja: kolumna changeChannelId już istnieje.');
+    }
+  });
+}
 
 /**
  * Pobiera ustawienia kanałów logów dla danego serwera.
@@ -173,7 +195,6 @@ function sendChangeLog(guild, embed) {
 }
 
 client.once('ready', () => {
-  // Ustawienie statusu bota na streaming z opisem "cinamoinka" i linkiem do Twitch
   client.user.setPresence({
     activities: [{
       name: 'cinamoinka',
@@ -223,7 +244,6 @@ client.on('messageCreate', async (message) => {
   if (message.content === '!create embed') {
     if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator))
       return message.reply('Tylko administratorzy mogą tworzyć embedy.');
-      
     const filter = m => m.author.id === message.author.id;
     message.channel.send('Podaj nazwę embeda:').then(() => {
       message.channel.awaitMessages({ filter, max: 1, time: 30000, errors: ['time'] })
@@ -237,7 +257,6 @@ client.on('messageCreate', async (message) => {
               message.channel.awaitMessages({ filter, max: 1, time: 30000, errors: ['time'] })
               .then(collectedContent => {
                 const embedContent = collectedContent.first().content.trim();
-                // Zapis embed do bazy (dla konkretnego serwera)
                 db.run(
                   'INSERT OR REPLACE INTO customEmbeds (guildId, embedName, embedTitle, embedContent) VALUES (?, ?, ?, ?)',
                   [message.guild.id, embedName, embedTitle, embedContent],
@@ -327,7 +346,6 @@ client.on('messageCreate', async (message) => {
         }
       )
       .setFooter({ text: '© tajgerek' });
-    // Wysyłamy embed z reakcją ✅, która nada rolę
     const sentMessage = await message.channel.send({ embeds: [regulaminEmbed] });
     try {
       await sentMessage.react('✅');
@@ -571,7 +589,6 @@ client.on('guildUpdate', async (oldGuild, newGuild) => {
   if (oldGuild.icon !== newGuild.icon) {
     changes.push(`Ikona serwera została zmieniona.`);
   }
-  // Dodaj inne porównania, jeśli chcesz
   if (changes.length > 0) {
     const embed = new EmbedBuilder()
       .setTitle('Zmiany w serwerze')
@@ -589,7 +606,6 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
   if (oldChannel.name !== newChannel.name) {
     changes.push(`Nazwa kanału zmieniona z "${oldChannel.name}" na "${newChannel.name}"`);
   }
-  // Możesz dodać porównanie uprawnień lub innych właściwości kanału
   if (changes.length > 0) {
     const embed = new EmbedBuilder()
       .setTitle('Zmiany w kanale')
@@ -610,7 +626,6 @@ client.on('roleUpdate', async (oldRole, newRole) => {
   if (oldRole.color !== newRole.color) {
     changes.push(`Kolor roli zmieniony z "${oldRole.hexColor}" na "${newRole.hexColor}"`);
   }
-  // Możesz dodać kolejne porównania właściwości roli
   if (changes.length > 0) {
     const embed = new EmbedBuilder()
       .setTitle('Zmiany w roli')
