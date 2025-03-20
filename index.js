@@ -31,9 +31,8 @@ const db = new sqlite3.Database('./logChannels.db', (err) => {
   }
 });
 
-// Funkcja migracyjna – sprawdzamy, czy istnieje kolumna changeChannelId
+// Funkcja migracyjna – tworzymy tabele i dodajemy kolumnę changeChannelId, jeśli nie istnieje
 function initDatabase() {
-  // Tworzymy tabelę logChannels jeśli nie istnieje
   db.run(
     `CREATE TABLE IF NOT EXISTS logChannels (
       guildId TEXT PRIMARY KEY,
@@ -46,7 +45,6 @@ function initDatabase() {
       else migrateLogChannels();
     }
   );
-  // Tworzymy tabelę customEmbeds
   db.run(
     `CREATE TABLE IF NOT EXISTS customEmbeds (
       guildId TEXT,
@@ -61,7 +59,6 @@ function initDatabase() {
   );
 }
 
-// Sprawdzamy, czy tabela logChannels ma kolumnę changeChannelId, jeśli nie – dodajemy ją
 function migrateLogChannels() {
   db.all(`PRAGMA table_info(logChannels)`, (err, rows) => {
     if (err) {
@@ -218,7 +215,7 @@ client.on('messageCreate', async (message) => {
     return message.channel.send('Pong!');
   }
 
-  // !help – wyświetla tylko komendy !ping, !embed oraz !log, !clear, !create embed, !delete embed
+  // !help – wyświetla komendy
   if (message.content === '!help') {
     const helpEmbed = new EmbedBuilder()
       .setColor('#1abc9c')
@@ -580,51 +577,49 @@ client.on('messageReactionRemove', async (reaction, user) => {
 // OBSŁUGA ZDARZEŃ – zmiany na serwerze (change)
 //
 
-// Logowanie zmian w serwerze (guildUpdate)
-client.on('guildUpdate', async (oldGuild, newGuild) => {
-  let changes = [];
-  if (oldGuild.name !== newGuild.name) {
-    changes.push(`Nazwa serwera zmieniona z "${oldGuild.name}" na "${newGuild.name}"`);
-  }
-  if (oldGuild.icon !== newGuild.icon) {
-    changes.push(`Ikona serwera została zmieniona.`);
-  }
-  if (changes.length > 0) {
-    const embed = new EmbedBuilder()
-      .setTitle('Zmiany w serwerze')
-      .setColor('#3498db')
-      .setDescription(changes.join('\n'))
-      .setTimestamp();
-    sendChangeLog(newGuild, embed);
-  }
+// --- Role ---
+
+// roleCreate: logujemy utworzenie nowej roli
+client.on('roleCreate', async (role) => {
+  if (!role.guild) return;
+  const embed = new EmbedBuilder()
+    .setTitle('Utworzono rolę')
+    .setColor('#2ecc71')
+    .setDescription(`Nowa rola **${role.name}** została utworzona.\nKolor: ${role.hexColor}\nUprawnienia: ${role.permissions.toArray().join(', ') || 'Brak'}`)
+    .setTimestamp();
+  sendChangeLog(role.guild, embed);
 });
 
-// Logowanie zmian w kanałach (channelUpdate)
-client.on('channelUpdate', async (oldChannel, newChannel) => {
-  if (!newChannel.guild) return;
-  let changes = [];
-  if (oldChannel.name !== newChannel.name) {
-    changes.push(`Nazwa kanału zmieniona z "${oldChannel.name}" na "${newChannel.name}"`);
-  }
-  if (changes.length > 0) {
-    const embed = new EmbedBuilder()
-      .setTitle('Zmiany w kanale')
-      .setColor('#3498db')
-      .setDescription(changes.join('\n'))
-      .setTimestamp();
-    sendChangeLog(newChannel.guild, embed);
-  }
+// roleDelete: logujemy usunięcie roli
+client.on('roleDelete', async (role) => {
+  if (!role.guild) return;
+  const embed = new EmbedBuilder()
+    .setTitle('Usunięto rolę')
+    .setColor('#e74c3c')
+    .setDescription(`Rola **${role.name}** została usunięta.`)
+    .setTimestamp();
+  sendChangeLog(role.guild, embed);
 });
 
-// Logowanie zmian w rolach (roleUpdate)
+// roleUpdate: logujemy zmiany w roli – nazwę, kolor i uprawnienia
 client.on('roleUpdate', async (oldRole, newRole) => {
   if (!newRole.guild) return;
   let changes = [];
   if (oldRole.name !== newRole.name) {
-    changes.push(`Nazwa roli zmieniona z "${oldRole.name}" na "${newRole.name}"`);
+    changes.push(`Nazwa zmieniona z "${oldRole.name}" na "${newRole.name}"`);
   }
   if (oldRole.color !== newRole.color) {
-    changes.push(`Kolor roli zmieniony z "${oldRole.hexColor}" na "${newRole.hexColor}"`);
+    changes.push(`Kolor zmieniony z "${oldRole.hexColor}" na "${newRole.hexColor}"`);
+  }
+  const oldPerms = oldRole.permissions.toArray();
+  const newPerms = newRole.permissions.toArray();
+  const addedPerms = newPerms.filter(p => !oldPerms.includes(p));
+  const removedPerms = oldPerms.filter(p => !newPerms.includes(p));
+  if (addedPerms.length > 0) {
+    changes.push(`Dodano uprawnienia: ${addedPerms.join(', ')}`);
+  }
+  if (removedPerms.length > 0) {
+    changes.push(`Usunięto uprawnienia: ${removedPerms.join(', ')}`);
   }
   if (changes.length > 0) {
     const embed = new EmbedBuilder()
@@ -633,6 +628,94 @@ client.on('roleUpdate', async (oldRole, newRole) => {
       .setDescription(changes.join('\n'))
       .setTimestamp();
     sendChangeLog(newRole.guild, embed);
+  }
+});
+
+// --- Kanały ---
+
+// channelCreate: logujemy utworzenie kanału
+client.on('channelCreate', async (channel) => {
+  if (!channel.guild) return;
+  const embed = new EmbedBuilder()
+    .setTitle('Utworzono kanał')
+    .setColor('#2ecc71')
+    .setDescription(`Kanał **${channel.name}** został utworzony.`)
+    .setTimestamp();
+  sendChangeLog(channel.guild, embed);
+});
+
+// channelDelete: logujemy usunięcie kanału
+client.on('channelDelete', async (channel) => {
+  if (!channel.guild) return;
+  const embed = new EmbedBuilder()
+    .setTitle('Usunięto kanał')
+    .setColor('#e74c3c')
+    .setDescription(`Kanał **${channel.name}** został usunięty.`)
+    .setTimestamp();
+  sendChangeLog(channel.guild, embed);
+});
+
+// channelUpdate: logujemy zmiany w kanale – nazwa, uprawnienia itp.
+client.on('channelUpdate', async (oldChannel, newChannel) => {
+  if (!newChannel.guild) return;
+  let changes = [];
+  if (oldChannel.name !== newChannel.name) {
+    changes.push(`Nazwa zmieniona z "${oldChannel.name}" na "${newChannel.name}"`);
+  }
+  
+  // Porównanie permission overwrites
+  const oldOverwrites = oldChannel.permissionOverwrites.cache;
+  const newOverwrites = newChannel.permissionOverwrites.cache;
+  
+  // Jeśli liczba overwrite się różni
+  if (oldOverwrites.size !== newOverwrites.size) {
+    changes.push("Liczba wpisów uprawnień została zmieniona.");
+  }
+  
+  // Sprawdzenie szczegółowych różnic dla każdego wpisu
+  newOverwrites.forEach((newOverwrite, id) => {
+    const oldOverwrite = oldOverwrites.get(id);
+    if (!oldOverwrite) {
+      changes.push(`Dodano nowe uprawnienia dla ${newOverwrite.type === 'role' ? 'roli' : 'użytkownika'} o ID ${id}.`);
+    } else {
+      const oldAllow = oldOverwrite.allow.toArray();
+      const newAllow = newOverwrite.allow.toArray();
+      const addedAllow = newAllow.filter(p => !oldAllow.includes(p));
+      const removedAllow = oldAllow.filter(p => !newAllow.includes(p));
+      if (addedAllow.length > 0) {
+        changes.push(`Dla ${newOverwrite.type === 'role' ? 'roli' : 'użytkownika'} ${id} dodano uprawnienia: ${addedAllow.join(', ')}`);
+      }
+      if (removedAllow.length > 0) {
+        changes.push(`Dla ${newOverwrite.type === 'role' ? 'roli' : 'użytkownika'} ${id} usunięto uprawnienia: ${removedAllow.join(', ')}`);
+      }
+      
+      const oldDeny = oldOverwrite.deny.toArray();
+      const newDeny = newOverwrite.deny.toArray();
+      const addedDeny = newDeny.filter(p => !oldDeny.includes(p));
+      const removedDeny = oldDeny.filter(p => !newDeny.includes(p));
+      if (addedDeny.length > 0) {
+        changes.push(`Dla ${newOverwrite.type === 'role' ? 'roli' : 'użytkownika'} ${id} dodano zakazy: ${addedDeny.join(', ')}`);
+      }
+      if (removedDeny.length > 0) {
+        changes.push(`Dla ${newOverwrite.type === 'role' ? 'roli' : 'użytkownika'} ${id} usunięto zakazy: ${removedDeny.join(', ')}`);
+      }
+    }
+  });
+  
+  // Wykrycie usuniętych wpisów
+  oldOverwrites.forEach((oldOverwrite, id) => {
+    if (!newOverwrites.has(id)) {
+      changes.push(`Usunięto uprawnienia dla ${oldOverwrite.type === 'role' ? 'roli' : 'użytkownika'} o ID ${id}.`);
+    }
+  });
+  
+  if (changes.length > 0) {
+    const embed = new EmbedBuilder()
+      .setTitle('Zmiany w kanale')
+      .setColor('#3498db')
+      .setDescription(changes.join('\n'))
+      .setTimestamp();
+    sendChangeLog(newChannel.guild, embed);
   }
 });
 
@@ -820,35 +903,6 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
       .setTimestamp();
     sendVoiceLog(newState.guild, embed);
   }
-});
-
-client.on('guildMemberUpdate', async (oldMember, newMember) => {
-  if (oldMember.communicationDisabledUntilTimestamp === newMember.communicationDisabledUntilTimestamp) return;
-  let action = newMember.communicationDisabledUntilTimestamp ? "Timeout przydzielony" : "Timeout usunięty";
-  let executor = "Nieznany";
-  try {
-    const fetchedLogs = await newMember.guild.fetchAuditLogs({ type: 24, limit: 5 });
-    const updateLog = fetchedLogs.entries.find(entry =>
-      entry.target.id === newMember.id &&
-      entry.changes.some(change => change.key === 'communication_disabled_until') &&
-      (Date.now() - entry.createdTimestamp) < 5000
-    );
-    if (updateLog) {
-      executor = `<@${updateLog.executor.id}>`;
-    }
-  } catch (err) {
-    console.error(err);
-  }
-  const embed = new EmbedBuilder()
-    .setTitle(action)
-    .setColor(action === "Timeout przydzielony" ? '#FF0000' : '#00FF00')
-    .addFields(
-      { name: 'Użytkownik', value: `<@${newMember.id}>`, inline: true },
-      { name: 'Przez', value: executor, inline: true },
-      { name: 'Czas timeoutu', value: newMember.communicationDisabledUntil ? newMember.communicationDisabledUntil.toString() : "Brak", inline: false }
-    )
-    .setTimestamp();
-  sendTextLog(newMember.guild, { embeds: [embed] });
 });
 
 client.login(process.env.TOKEN);
