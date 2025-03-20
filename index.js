@@ -303,7 +303,14 @@ client.on('messageCreate', async (message) => {
         }
       )
       .setFooter({ text: '© tajgerek' });
-    return message.channel.send({ embeds: [regulaminEmbed] });
+    // Wysyłamy embed i dodajemy reakcję ✅ automatycznie
+    const sentMessage = await message.channel.send({ embeds: [regulaminEmbed] });
+    try {
+      await sentMessage.react('✅');
+    } catch (error) {
+      console.error("Nie udało się dodać reakcji ✅", error);
+    }
+    return;
   }
 
   if (message.content === '!embed opis') {
@@ -465,15 +472,37 @@ client.on('messageReactionAdd', async (reaction, user) => {
     }
   }
   if (!reaction.message.guild) return;
+  
+  // Obsługa roli na podstawie mapy dla innych emoji
   const roleId = reactionRoleMap[reaction.emoji.id];
-  if (!roleId) return;
-  try {
-    const member = await reaction.message.guild.members.fetch(user.id);
-    if (member.roles.cache.has(roleId)) return;
-    await member.roles.add(roleId);
-    console.log(`Dodano rolę (${roleId}) użytkownikowi ${user.tag}`);
-  } catch (error) {
-    console.error('Błąd przy dodawaniu roli:', error);
+  if (roleId) {
+    try {
+      const member = await reaction.message.guild.members.fetch(user.id);
+      if (!member.roles.cache.has(roleId)) {
+        await member.roles.add(roleId);
+        console.log(`Dodano rolę (${roleId}) użytkownikowi ${user.tag}`);
+      }
+    } catch (error) {
+      console.error('Błąd przy dodawaniu roli:', error);
+    }
+  }
+  
+  // Dodatkowa obsługa dla regulaminu – emoji ✅
+  if (reaction.emoji.name === '✅') {
+    // Sprawdzamy czy wiadomość zawiera embed z tytułem "REGULAMIN SERWERA DISCORD"
+    const embeds = reaction.message.embeds;
+    if (embeds.length && embeds[0].title === 'REGULAMIN SERWERA DISCORD') {
+      try {
+        const member = await reaction.message.guild.members.fetch(user.id);
+        // Rola do nadania: 1348705958213456004
+        if (!member.roles.cache.has('1348705958213456004')) {
+          await member.roles.add('1348705958213456004');
+          console.log(`Dodano rolę (1348705958213456004) użytkownikowi ${user.tag} za reakcję ✅`);
+        }
+      } catch (error) {
+        console.error('Błąd przy dodawaniu roli regulamin:', error);
+      }
+    }
   }
 });
 
@@ -488,15 +517,35 @@ client.on('messageReactionRemove', async (reaction, user) => {
     }
   }
   if (!reaction.message.guild) return;
+  
+  // Obsługa roli na podstawie mapy dla innych emoji
   const roleId = reactionRoleMap[reaction.emoji.id];
-  if (!roleId) return;
-  try {
-    const member = await reaction.message.guild.members.fetch(user.id);
-    if (!member.roles.cache.has(roleId)) return;
-    await member.roles.remove(roleId);
-    console.log(`Usunięto rolę (${roleId}) użytkownikowi ${user.tag}`);
-  } catch (error) {
-    console.error('Błąd przy usuwaniu roli:', error);
+  if (roleId) {
+    try {
+      const member = await reaction.message.guild.members.fetch(user.id);
+      if (member.roles.cache.has(roleId)) {
+        await member.roles.remove(roleId);
+        console.log(`Usunięto rolę (${roleId}) użytkownikowi ${user.tag}`);
+      }
+    } catch (error) {
+      console.error('Błąd przy usuwaniu roli:', error);
+    }
+  }
+  
+  // Dodatkowa obsługa dla regulaminu – emoji ✅
+  if (reaction.emoji.name === '✅') {
+    const embeds = reaction.message.embeds;
+    if (embeds.length && embeds[0].title === 'REGULAMIN SERWERA DISCORD') {
+      try {
+        const member = await reaction.message.guild.members.fetch(user.id);
+        if (member.roles.cache.has('1348705958213456004')) {
+          await member.roles.remove('1348705958213456004');
+          console.log(`Usunięto rolę (1348705958213456004) użytkownikowi ${user.tag} po usunięciu reakcji ✅`);
+        }
+      } catch (error) {
+        console.error('Błąd przy usuwaniu roli regulamin:', error);
+      }
+    }
   }
 });
 
@@ -511,7 +560,6 @@ client.on('messageDelete', async (message) => {
       msg = await message.fetch();
     } catch (err) {
       if (err.code === 10008) {
-        // Jeśli nie uda się pobrać, zachowujemy to, co mamy.
         if (!msg.content) {
           msg.content = 'Treść nie jest dostępna (wiadomość częściowa)';
         }
@@ -522,10 +570,8 @@ client.on('messageDelete', async (message) => {
     }
   }
 
-  // Jeśli wiadomość pochodzi od bota – nie logujemy
   if (msg.author && msg.author.bot) return;
 
-  // Pobieramy autora – jeśli autor nie jest dostępny, spróbujemy użyć danych z audytu
   let author = msg.author;
   let executor = null;
   let deletionLog = null;
@@ -534,8 +580,6 @@ client.on('messageDelete', async (message) => {
     deletionLog = fetchedLogs.entries.first();
     if (deletionLog) {
       const { executor: logExecutor, target, createdTimestamp } = deletionLog;
-      // Jeśli target (użytkownik, którego wiadomość została usunięta) ma takie samo ID jak author,
-      // oraz log nie jest starszy niż 5 sekund, uznajemy, że log dotyczy tej wiadomości.
       if (msg.author?.id && target.id === msg.author.id && (Date.now() - createdTimestamp) < 5000) {
         executor = `<@${logExecutor.id}>`;
       }
@@ -543,12 +587,10 @@ client.on('messageDelete', async (message) => {
   } catch (err) {
     console.error(err);
   }
-  // Jeśli nie mamy autora, ale mamy log audytu – używamy targetu jako autora
   if (!author && deletionLog) {
     author = deletionLog.target;
   }
 
-  // Budujemy pola embeda
   const fields = [];
   if (author) {
     fields.push({ name: 'Autor', value: `<@${author.id}>`, inline: true });
@@ -734,4 +776,3 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 });
 
 client.login(process.env.TOKEN);
-
