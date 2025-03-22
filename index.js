@@ -804,7 +804,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     sendVoiceLog(oldState.guild, embed);
   }
 
-  // Obsługa mute/odciszenia z dodatkową weryfikacją stanu
+  // Obsługa mute/odciszenia (mute)
   if (newState.serverMute && !oldState.serverMute) {
     let executor = "Nieznany";
     try {
@@ -830,7 +830,6 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
       .setTimestamp();
     sendVoiceLog(newState.guild, embed);
   }
-
   if (!newState.serverMute && oldState.serverMute) {
     let executor = "Nieznany";
     try {
@@ -857,8 +856,8 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     sendVoiceLog(newState.guild, embed);
   }
 
-  if (newState.serverDeaf !== oldState.serverDeaf) {
-    let action = newState.serverDeaf ? "Wyciszenie słuchu" : "Odciszenie słuchu";
+  // Obsługa deaf/odciszenia słuchu (deaf) – komunikat pojawi się tylko, gdy użytkownik był wcześniej wyciszony słuchowo
+  if (newState.serverDeaf && !oldState.serverDeaf) {
     let executor = "Nieznany";
     try {
       const fetchedLogs = await newState.guild.fetchAuditLogs({ type: 24, limit: 5 });
@@ -874,8 +873,33 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
       console.error(err);
     }
     const embed = new EmbedBuilder()
-      .setTitle(action)
-      .setColor(newState.serverDeaf ? '#FF0000' : '#00FF00')
+      .setTitle("Wyciszenie słuchu")
+      .setColor('#FF0000')
+      .addFields(
+        { name: 'Użytkownik', value: `<@${member.id}>`, inline: true },
+        { name: 'Przez', value: executor, inline: true }
+      )
+      .setTimestamp();
+    sendVoiceLog(newState.guild, embed);
+  }
+  if (!newState.serverDeaf && oldState.serverDeaf) {
+    let executor = "Nieznany";
+    try {
+      const fetchedLogs = await newState.guild.fetchAuditLogs({ type: 24, limit: 5 });
+      const updateLog = fetchedLogs.entries.find(entry =>
+        entry.target.id === member.id &&
+        entry.changes.some(change => change.key === 'deaf') &&
+        (Date.now() - entry.createdTimestamp) < 5000
+      );
+      if (updateLog) {
+        executor = `<@${updateLog.executor.id}>`;
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    const embed = new EmbedBuilder()
+      .setTitle("Odciszenie słuchu")
+      .setColor('#00FF00')
       .addFields(
         { name: 'Użytkownik', value: `<@${member.id}>`, inline: true },
         { name: 'Przez', value: executor, inline: true }
