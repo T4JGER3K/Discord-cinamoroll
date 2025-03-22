@@ -131,9 +131,6 @@ function setLogChannel(guildId, channelId, logType, callback) {
   });
 }
 
-/**
- * Funkcja wysyłająca logi tekstowe (dla zdarzeń wiadomości, timeoutów)
- */
 function sendTextLog(guild, logPayload) {
   getLogChannels(guild.id, (settings) => {
     if (settings && settings.textChannelId) {
@@ -151,9 +148,6 @@ function sendTextLog(guild, logPayload) {
   });
 }
 
-/**
- * Funkcja wysyłająca logi głosowe (dla zdarzeń kanałów głosowych)
- */
 function sendVoiceLog(guild, embed) {
   getLogChannels(guild.id, (settings) => {
     if (settings && settings.voiceChannelId) {
@@ -171,9 +165,6 @@ function sendVoiceLog(guild, embed) {
   });
 }
 
-/**
- * Funkcja wysyłająca logi zmian (dla zdarzeń change)
- */
 function sendChangeLog(guild, embed) {
   getLogChannels(guild.id, (settings) => {
     if (settings && settings.changeChannelId) {
@@ -203,19 +194,13 @@ client.once('ready', () => {
   console.log(`Zalogowano jako ${client.user.tag}!`);
 });
 
-//
-// OBSŁUGA KOMEND (ping, help, embed, log, clear, create embed, delete embed)
-//
-
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
-  // !ping
   if (message.content === '!ping') {
     return message.channel.send('Pong!');
   }
 
-  // !help – wyświetla komendy
   if (message.content === '!help') {
     const helpEmbed = new EmbedBuilder()
       .setColor('#1abc9c')
@@ -237,7 +222,6 @@ client.on('messageCreate', async (message) => {
     return message.channel.send({ embeds: [helpEmbed] });
   }
 
-  // !create embed – tworzenie niestandardowego embeda (tylko admin)
   if (message.content === '!create embed') {
     if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator))
       return message.reply('Tylko administratorzy mogą tworzyć embedy.');
@@ -280,7 +264,6 @@ client.on('messageCreate', async (message) => {
     return;
   }
 
-  // !delete embed nazwa – usuwanie niestandardowego embeda (tylko admin)
   if (message.content.startsWith('!delete embed')) {
     if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator))
       return message.reply('Tylko administratorzy mogą usuwać embedy.');
@@ -304,7 +287,6 @@ client.on('messageCreate', async (message) => {
     return;
   }
 
-  // Predefiniowane komendy – regulamin, opis, role
   if (message.content === '!embed regulamin') {
     if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator))
       return message.reply('Tylko administratorzy mogą używać tej komendy.');
@@ -410,7 +392,6 @@ client.on('messageCreate', async (message) => {
     return;
   }
 
-  // Ogólna komenda !embed dla niestandardowych embedów – pomijamy predefiniowane nazwy
   if (message.content.startsWith('!embed')) {
     let args = message.content.slice('!embed'.length).trim();
     if (['regulamin', 'opis', 'role'].includes(args.toLowerCase())) return;
@@ -435,7 +416,6 @@ client.on('messageCreate', async (message) => {
     return;
   }
 
-  // !log – ustawianie kanału logów (text, edit, voice, change)
   if (message.content.startsWith('!log')) {
     if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator))
       return message.reply('Tylko administratorzy mogą ustawiać kanał logów.');
@@ -455,7 +435,6 @@ client.on('messageCreate', async (message) => {
     });
   }
 
-  // !clear – usuwanie wiadomości (tylko admin)
   if (message.content.startsWith('!clear')) {
     if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator))
       return message.reply('Nie masz uprawnień do usuwania wiadomości.');
@@ -474,19 +453,16 @@ client.on('messageCreate', async (message) => {
   }
 });
 
-//
-// OBSŁUGA REAKCJI – przypisywanie ról
-//
 const reactionRoleMap = {
-  "1350175816314650654": "1349830365761769532", // Radiant
-  "1350175814456709322": "1350176656631005184", // Immortal
-  "1350175817962881034": "1350633930730242178", // Ascendant
-  "1350175812929720430": "1350633934047940719", // Diamond
-  "1350175819359715533": "1350633936903995472", // Platinum
-  "1350175808253329538": "1350633938661670953", // Gold
-  "1350175811147141315": "1350633940079214665", // Silver
-  "1350175809901559919": "1350633970684919921", // Bronze
-  "1350175806596321380": "1350634082186428436"  // Iron
+  "1350175816314650654": "1349830365761769532", 
+  "1350175814456709322": "1350176656631005184", 
+  "1350175817962881034": "1350633930730242178", 
+  "1350175812929720430": "1350633934047940719", 
+  "1350175819359715533": "1350633936903995472", 
+  "1350175808253329538": "1350633938661670953", 
+  "1350175811147141315": "1350633940079214665", 
+  "1350175809901559919": "1350633970684919921", 
+  "1350175806596321380": "1350634082186428436"  
 };
 
 client.on('messageReactionAdd', async (reaction, user) => {
@@ -501,7 +477,6 @@ client.on('messageReactionAdd', async (reaction, user) => {
   }
   if (!reaction.message.guild) return;
   
-  // Obsługa roli na podstawie mapy dla innych emoji
   const roleId = reactionRoleMap[reaction.emoji.id];
   if (roleId) {
     try {
@@ -515,7 +490,6 @@ client.on('messageReactionAdd', async (reaction, user) => {
     }
   }
   
-  // Dodatkowa obsługa dla regulaminu – emoji ✅
   if (reaction.emoji.name === '✅') {
     const embeds = reaction.message.embeds;
     if (embeds.length && embeds[0].title === 'REGULAMIN SERWERA DISCORD') {
@@ -573,13 +547,6 @@ client.on('messageReactionRemove', async (reaction, user) => {
   }
 });
 
-//
-// OBSŁUGA ZDARZEŃ – zmiany na serwerze (change)
-//
-
-// --- Role ---
-
-// roleCreate: logujemy utworzenie nowej roli
 client.on('roleCreate', async (role) => {
   if (!role.guild) return;
   const embed = new EmbedBuilder()
@@ -590,7 +557,6 @@ client.on('roleCreate', async (role) => {
   sendChangeLog(role.guild, embed);
 });
 
-// roleDelete: logujemy usunięcie roli
 client.on('roleDelete', async (role) => {
   if (!role.guild) return;
   const embed = new EmbedBuilder()
@@ -601,7 +567,6 @@ client.on('roleDelete', async (role) => {
   sendChangeLog(role.guild, embed);
 });
 
-// roleUpdate: logujemy zmiany w roli – nazwę, kolor i uprawnienia
 client.on('roleUpdate', async (oldRole, newRole) => {
   if (!newRole.guild) return;
   let changes = [];
@@ -631,9 +596,6 @@ client.on('roleUpdate', async (oldRole, newRole) => {
   }
 });
 
-// --- Kanały ---
-
-// channelCreate: logujemy utworzenie kanału
 client.on('channelCreate', async (channel) => {
   if (!channel.guild) return;
   const embed = new EmbedBuilder()
@@ -644,7 +606,6 @@ client.on('channelCreate', async (channel) => {
   sendChangeLog(channel.guild, embed);
 });
 
-// channelDelete: logujemy usunięcie kanału
 client.on('channelDelete', async (channel) => {
   if (!channel.guild) return;
   const embed = new EmbedBuilder()
@@ -655,7 +616,6 @@ client.on('channelDelete', async (channel) => {
   sendChangeLog(channel.guild, embed);
 });
 
-// channelUpdate: logujemy zmiany w kanale – nazwa, uprawnienia itp.
 client.on('channelUpdate', async (oldChannel, newChannel) => {
   if (!newChannel.guild) return;
   let changes = [];
@@ -663,16 +623,13 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
     changes.push(`Nazwa zmieniona z "${oldChannel.name}" na "${newChannel.name}"`);
   }
   
-  // Porównanie permission overwrites
   const oldOverwrites = oldChannel.permissionOverwrites.cache;
   const newOverwrites = newChannel.permissionOverwrites.cache;
   
-  // Jeśli liczba overwrite się różni
   if (oldOverwrites.size !== newOverwrites.size) {
     changes.push("Liczba wpisów uprawnień została zmieniona.");
   }
   
-  // Sprawdzenie szczegółowych różnic dla każdego wpisu
   newOverwrites.forEach((newOverwrite, id) => {
     const oldOverwrite = oldOverwrites.get(id);
     if (!oldOverwrite) {
@@ -702,7 +659,6 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
     }
   });
   
-  // Wykrycie usuniętych wpisów
   oldOverwrites.forEach((oldOverwrite, id) => {
     if (!newOverwrites.has(id)) {
       changes.push(`Usunięto uprawnienia dla ${oldOverwrite.type === 'role' ? 'roli' : 'użytkownika'} o ID ${id}.`);
@@ -719,9 +675,6 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
   }
 });
 
-//
-// OBSŁUGA ZDARZEŃ WIADOMOŚCI – edycja i usunięcie
-//
 client.on('messageDelete', async (message) => {
   let msg = message;
   if (message.partial) {
@@ -810,12 +763,11 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
   sendTextLog(oldMessage.guild, { embeds: [embed] });
 });
 
-//
-// OBSŁUGA ZDARZEŃ GŁOSOWYCH – dołączenie, opuszczenie, przeniesienie, wyciszenie/deaf oraz timeout
-//
 client.on('voiceStateUpdate', async (oldState, newState) => {
   const member = newState.member || oldState.member;
   if (!member) return;
+
+  // Obsługa dołączania, opuszczania i przenoszenia między kanałami
   if (!oldState.channelId && newState.channelId) {
     const embed = new EmbedBuilder()
       .setTitle('Dołączenie do kanału')
@@ -851,8 +803,9 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
       .setTimestamp();
     sendVoiceLog(oldState.guild, embed);
   }
-  if (newState.serverMute !== oldState.serverMute) {
-    let action = newState.serverMute ? "Wyciszenie (mute)" : "Odciszenie (mute)";
+
+  // Obsługa mute/odciszenia z dodatkową weryfikacją stanu
+  if (newState.serverMute && !oldState.serverMute) {
     let executor = "Nieznany";
     try {
       const fetchedLogs = await newState.guild.fetchAuditLogs({ type: 24, limit: 5 });
@@ -868,8 +821,8 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
       console.error(err);
     }
     const embed = new EmbedBuilder()
-      .setTitle(action)
-      .setColor(newState.serverMute ? '#FF0000' : '#00FF00')
+      .setTitle("Wyciszenie (mute)")
+      .setColor('#FF0000')
       .addFields(
         { name: 'Użytkownik', value: `<@${member.id}>`, inline: true },
         { name: 'Przez', value: executor, inline: true }
@@ -877,6 +830,33 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
       .setTimestamp();
     sendVoiceLog(newState.guild, embed);
   }
+
+  if (!newState.serverMute && oldState.serverMute) {
+    let executor = "Nieznany";
+    try {
+      const fetchedLogs = await newState.guild.fetchAuditLogs({ type: 24, limit: 5 });
+      const updateLog = fetchedLogs.entries.find(entry =>
+        entry.target.id === member.id &&
+        entry.changes.some(change => change.key === 'mute') &&
+        (Date.now() - entry.createdTimestamp) < 5000
+      );
+      if (updateLog) {
+        executor = `<@${updateLog.executor.id}>`;
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    const embed = new EmbedBuilder()
+      .setTitle("Odciszenie (mute)")
+      .setColor('#00FF00')
+      .addFields(
+        { name: 'Użytkownik', value: `<@${member.id}>`, inline: true },
+        { name: 'Przez', value: executor, inline: true }
+      )
+      .setTimestamp();
+    sendVoiceLog(newState.guild, embed);
+  }
+
   if (newState.serverDeaf !== oldState.serverDeaf) {
     let action = newState.serverDeaf ? "Wyciszenie słuchu" : "Odciszenie słuchu";
     let executor = "Nieznany";
