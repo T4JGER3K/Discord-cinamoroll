@@ -539,6 +539,45 @@ client.on('messageReactionRemove', async (reaction, user) => {
   }
 });
 
+// EVENT: Logowanie zmian ról u użytkownika (guildMemberUpdate)
+client.on('guildMemberUpdate', async (oldMember, newMember) => {
+  const oldRoles = oldMember.roles.cache;
+  const newRoles = newMember.roles.cache;
+  const addedRoles = newRoles.filter(role => !oldRoles.has(role.id));
+  const removedRoles = oldRoles.filter(role => !newRoles.has(role.id));
+
+  if (addedRoles.size === 0 && removedRoles.size === 0) return;
+
+  let changes = [];
+  if (addedRoles.size > 0) {
+    changes.push(`Dodano role: ${addedRoles.map(r => `<@&${r.id}>`).join(', ')}`);
+  }
+  if (removedRoles.size > 0) {
+    changes.push(`Usunięto role: ${removedRoles.map(r => `<@&${r.id}>`).join(', ')}`);
+  }
+
+  // Próba pobrania wpisu audytu, aby określić, przez kogo dokonano zmiany
+  let executor = "Nieznany";
+  try {
+    const fetchedLogs = await newMember.guild.fetchAuditLogs({ type: 'MEMBER_ROLE_UPDATE', limit: 1 });
+    const logEntry = fetchedLogs.entries.first();
+    if (logEntry && logEntry.target.id === newMember.id && (Date.now() - logEntry.createdTimestamp) < 5000) {
+      executor = `<@${logEntry.executor.id}>`;
+    }
+  } catch (error) {
+    console.error('Błąd przy pobieraniu logów audytu dla zmian ról:', error);
+  }
+
+  const embed = new EmbedBuilder()
+    .setTitle('Zmiany ról')
+    .setColor('#8e44ad')
+    .setDescription(`Użytkownik: <@${newMember.id}>\n${changes.join('\n')}\nPrzez: ${executor}`)
+    .setFooter({ text: '© tajgerek' })
+    .setTimestamp();
+
+  sendChangeLog(newMember.guild, embed);
+});
+
 client.on('roleCreate', async (role) => {
   if (!role.guild) return;
   const embed = new EmbedBuilder()
