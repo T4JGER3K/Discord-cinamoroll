@@ -4,7 +4,8 @@ const {
   Partials,
   EmbedBuilder,
   PermissionsBitField,
-  ActivityType
+  ActivityType,
+  ChannelType
 } = require('discord.js');
 const sqlite3 = require('sqlite3').verbose();
 
@@ -605,7 +606,7 @@ client.on('channelDelete', async (channel) => {
   sendChangeLog(channel.guild, embed);
 });
 
-// Poprawiony event channelUpdate z dodatkowymi sprawdzeniami zmian (temat, NSFW, uprawnienia)
+// Poprawiony event channelUpdate z dodatkowymi sprawdzeniami (nazwa, temat, NSFW, uprawnienia)
 client.on('channelUpdate', async (oldChannel, newChannel) => {
   if (!newChannel.guild) return;
   let changes = [];
@@ -614,14 +615,14 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
     changes.push(`Nazwa zmieniona z "${oldChannel.name}" na "${newChannel.name}"`);
   }
   
-  // Dodane sprawdzenie zmiany tematu kanału
-  if (oldChannel.topic !== newChannel.topic) {
-    changes.push(`Temat zmieniony z "${oldChannel.topic || 'Brak'}" na "${newChannel.topic || 'Brak'}"`);
-  }
-  
-  // Dodane sprawdzenie zmiany ustawienia NSFW (jeśli dotyczy)
-  if (oldChannel.nsfw !== newChannel.nsfw) {
-    changes.push(`Ustawienie NSFW zmienione z "${oldChannel.nsfw}" na "${newChannel.nsfw}"`);
+  // Dla kanałów tekstowych sprawdzamy temat i NSFW
+  if (newChannel.type === ChannelType.GuildText) {
+    if (oldChannel.topic !== newChannel.topic) {
+      changes.push(`Temat zmieniony z "${oldChannel.topic || 'Brak'}" na "${newChannel.topic || 'Brak'}"`);
+    }
+    if (oldChannel.nsfw !== newChannel.nsfw) {
+      changes.push(`Ustawienie NSFW zmienione z "${oldChannel.nsfw}" na "${newChannel.nsfw}"`);
+    }
   }
   
   const oldOverwrites = oldChannel.permissionOverwrites.cache;
@@ -667,6 +668,7 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
   });
   
   if (changes.length > 0) {
+    console.log("channelUpdate changes:", changes);
     const embed = new EmbedBuilder()
       .setTitle('Zmiany w kanale')
       .setColor('#3498db')
