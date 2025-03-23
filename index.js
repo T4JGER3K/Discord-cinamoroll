@@ -202,7 +202,8 @@ client.on('messageCreate', async (message) => {
         { name: '**!ping**', value: 'Sprawdź, czy bot działa.' },
         { name: '**!embed**', value: 'Wyświetla embedy. Użyj: `!embed nazwa`.\nDostępne typy: regulamin, role, opis oraz niestandardowe embedy.' },
         { name: '**!log**', value: 'Ustaw kanał logów. Dostępne typy: text, edit, voice, change.' }
-      );
+      )
+      .setFooter({ text: '© tajgerek' });
     if (message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
       helpEmbed.addFields(
         { name: '**!clear <liczba>**', value: 'Usuń wiadomości na kanale.' },
@@ -210,11 +211,9 @@ client.on('messageCreate', async (message) => {
         { name: '**!delete embed nazwa**', value: 'Usuwa niestandardowy embed.' }
       );
     }
-    helpEmbed.setFooter({ text: '© tajgerek' });
     return message.channel.send({ embeds: [helpEmbed] });
   }
 
-  // Komendy związane z embedami pozostają bez zmian
   if (message.content === '!create embed') {
     if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator))
       return message.reply('Tylko administratorzy mogą tworzyć embedy.');
@@ -546,6 +545,7 @@ client.on('roleCreate', async (role) => {
     .setTitle('Utworzono rolę')
     .setColor('#2ecc71')
     .setDescription(`Nowa rola **${role.name}** została utworzona.\nKolor: ${role.hexColor}\nUprawnienia: ${role.permissions.toArray().join(', ') || 'Brak'}`)
+    .setFooter({ text: '© tajgerek' })
     .setTimestamp();
   sendChangeLog(role.guild, embed);
 });
@@ -556,6 +556,7 @@ client.on('roleDelete', async (role) => {
     .setTitle('Usunięto rolę')
     .setColor('#e74c3c')
     .setDescription(`Rola **${role.name}** została usunięta.`)
+    .setFooter({ text: '© tajgerek' })
     .setTimestamp();
   sendChangeLog(role.guild, embed);
 });
@@ -584,6 +585,7 @@ client.on('roleUpdate', async (oldRole, newRole) => {
       .setTitle('Zmiany w roli')
       .setColor('#3498db')
       .setDescription(changes.join('\n'))
+      .setFooter({ text: '© tajgerek' })
       .setTimestamp();
     sendChangeLog(newRole.guild, embed);
   }
@@ -595,6 +597,7 @@ client.on('channelCreate', async (channel) => {
     .setTitle('Utworzono kanał')
     .setColor('#2ecc71')
     .setDescription(`Kanał **${channel.name}** został utworzony.`)
+    .setFooter({ text: '© tajgerek' })
     .setTimestamp();
   sendChangeLog(channel.guild, embed);
 });
@@ -605,6 +608,7 @@ client.on('channelDelete', async (channel) => {
     .setTitle('Usunięto kanał')
     .setColor('#e74c3c')
     .setDescription(`Kanał **${channel.name}** został usunięty.`)
+    .setFooter({ text: '© tajgerek' })
     .setTimestamp();
   sendChangeLog(channel.guild, embed);
 });
@@ -674,6 +678,7 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
       .setTitle('Zmiany w kanale')
       .setColor('#3498db')
       .setDescription(changes.join('\n'))
+      .setFooter({ text: '© tajgerek' })
       .setTimestamp()
     );
   } else {
@@ -733,6 +738,7 @@ client.on('messageDelete', async (message) => {
     .setTitle('Usunięta wiadomość')
     .setColor('#FF0000')
     .addFields(fields)
+    .setFooter({ text: '© tajgerek' })
     .setTimestamp();
   sendTextLog(msg.guild, { embeds: [embed] });
 });
@@ -765,6 +771,7 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
       { name: 'Stara treść', value: oldMessage.content || 'Brak treści' },
       { name: 'Nowa treść', value: newMessage.content || 'Brak treści' }
     )
+    .setFooter({ text: '© tajgerek' })
     .setTimestamp();
   sendTextLog(oldMessage.guild, { embeds: [embed] });
 });
@@ -831,6 +838,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
         { name: 'Użytkownik', value: `<@${member.id}>`, inline: true },
         { name: 'Przez', value: executor, inline: true }
       )
+      .setFooter({ text: '© tajgerek' })
       .setTimestamp();
     sendVoiceLog(newState.guild, embed);
   }
@@ -856,6 +864,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
         { name: 'Użytkownik', value: `<@${member.id}>`, inline: true },
         { name: 'Przez', value: executor, inline: true }
       )
+      .setFooter({ text: '© tajgerek' })
       .setTimestamp();
     sendVoiceLog(newState.guild, embed);
   }
@@ -882,6 +891,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
         { name: 'Użytkownik', value: `<@${member.id}>`, inline: true },
         { name: 'Przez', value: executor, inline: true }
       )
+      .setFooter({ text: '© tajgerek' })
       .setTimestamp();
     sendVoiceLog(newState.guild, embed);
   }
@@ -907,6 +917,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
         { name: 'Użytkownik', value: `<@${member.id}>`, inline: true },
         { name: 'Przez', value: executor, inline: true }
       )
+      .setFooter({ text: '© tajgerek' })
       .setTimestamp();
     sendVoiceLog(newState.guild, embed);
   }
