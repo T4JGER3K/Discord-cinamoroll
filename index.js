@@ -31,16 +31,17 @@ const db = new sqlite3.Database('./logChannels.db', (err) => {
 });
 
 function initDatabase() {
-  // Usunięto changeChannelId z tabeli
   db.run(
     `CREATE TABLE IF NOT EXISTS logChannels (
       guildId TEXT PRIMARY KEY,
       textChannelId TEXT,
       editChannelId TEXT,
-      voiceChannelId TEXT
+      voiceChannelId TEXT,
+      changeChannelId TEXT
     )`,
     (err) => {
       if (err) console.error('Błąd przy tworzeniu tabeli:', err.message);
+      else migrateChangeChannel();
     }
   );
   db.run(
@@ -57,11 +58,28 @@ function initDatabase() {
   );
 }
 
-// Usunięto migrację changeChannelId
+function migrateChangeChannel() {
+  // Sprawdzamy, czy kolumna changeChannelId istnieje
+  db.all(`PRAGMA table_info(logChannels)`, (err, rows) => {
+    if (err) {
+      console.error('Błąd przy pobieraniu informacji o tabeli:', err.message);
+      return;
+    }
+    const hasChangeColumn = rows.some(row => row.name === 'changeChannelId');
+    if (!hasChangeColumn) {
+      db.run(`ALTER TABLE logChannels ADD COLUMN changeChannelId TEXT`, (err) => {
+        if (err) console.error('Błąd przy migracji tabeli (dodawanie changeChannelId):', err.message);
+        else console.log('Migracja zakończona – kolumna changeChannelId została dodana.');
+      });
+    } else {
+      console.log('Migracja: kolumna changeChannelId już istnieje.');
+    }
+  });
+}
 
 function getLogChannels(guildId, callback) {
   db.get(
-    'SELECT textChannelId, editChannelId, voiceChannelId FROM logChannels WHERE guildId = ?',
+    'SELECT textChannelId, editChannelId, voiceChannelId, changeChannelId FROM logChannels WHERE guildId = ?',
     [guildId],
     (err, row) => {
       if (err) {
@@ -72,7 +90,8 @@ function getLogChannels(guildId, callback) {
       callback({
         textChannelId: row.textChannelId,
         editChannelId: row.editChannelId,
-        voiceChannelId: row.voiceChannelId
+        voiceChannelId: row.voiceChannelId,
+        changeChannelId: row.changeChannelId
       });
     }
   );
@@ -83,15 +102,16 @@ function setLogChannel(guildId, channelId, logType, callback) {
     let textId = settings ? settings.textChannelId : null;
     let editId = settings ? settings.editChannelId : null;
     let voiceId = settings ? settings.voiceChannelId : null;
+    let changeId = settings ? settings.changeChannelId : null;
 
     if (logType === 'text') textId = channelId;
     if (logType === 'edit') editId = channelId;
     if (logType === 'voice') voiceId = channelId;
-    // Usunięto warunek dla logType === 'change'
+    if (logType === 'change') changeId = channelId;
 
     db.run(
-      'INSERT OR REPLACE INTO logChannels (guildId, textChannelId, editChannelId, voiceChannelId) VALUES (?, ?, ?, ?)',
-      [guildId, textId, editId, voiceId],
+      'INSERT OR REPLACE INTO logChannels (guildId, textChannelId, editChannelId, voiceChannelId, changeChannelId) VALUES (?, ?, ?, ?, ?)',
+      [guildId, textId, editId, voiceId, changeId],
       (err) => {
         if (err) {
           console.error('Błąd przy zapisie kanału logów:', err.message);
@@ -137,6 +157,23 @@ function sendVoiceLog(guild, embed) {
   });
 }
 
+function sendChangeLog(guild, embed) {
+  getLogChannels(guild.id, (settings) => {
+    if (settings && settings.changeChannelId) {
+      guild.channels
+        .fetch(settings.changeChannelId)
+        .then(channel => {
+          if (channel && channel.isTextBased()) {
+            channel.send({ embeds: [embed] }).catch(err => console.error("Błąd przy wysyłaniu logu zmian:", err));
+          } else {
+            console.error("Kanał logów zmian nie został znaleziony lub nie jest tekstowy.");
+          }
+        })
+        .catch(err => console.error("Błąd przy pobieraniu kanału logów zmian:", err));
+    }
+  });
+}
+
 client.once('ready', () => {
   client.user.setPresence({
     activities: [{
@@ -164,7 +201,7 @@ client.on('messageCreate', async (message) => {
       .addFields(
         { name: '**!ping**', value: 'Sprawdź, czy bot działa.' },
         { name: '**!embed**', value: 'Wyświetla embedy. Użyj: `!embed nazwa`.\nDostępne typy: regulamin, role, opis oraz niestandardowe embedy.' },
-        { name: '**!log**', value: 'Ustaw kanał logów (text, edit, voice).' }
+        { name: '**!log**', value: 'Ustaw kanał logów. Dostępne typy: text, edit, voice, change.' }
       );
     if (message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
       helpEmbed.addFields(
@@ -177,6 +214,7 @@ client.on('messageCreate', async (message) => {
     return message.channel.send({ embeds: [helpEmbed] });
   }
 
+  // Komendy związane z embedami pozostają bez zmian
   if (message.content === '!create embed') {
     if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator))
       return message.reply('Tylko administratorzy mogą tworzyć embedy.');
@@ -373,15 +411,14 @@ client.on('messageCreate', async (message) => {
 
   if (message.content.startsWith('!log')) {
     if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator))
-      return message.reply('Tylko administratorzy mogą ustawiać kanał logów.');
+      return message.reply('Tylko administratorzy mogą ustawiać kanały logów.');
     const args = message.content.split(' ');
     if (args.length < 3)
       return message.reply('Podaj kanał oraz typ logów. Np. !log #log-channel text');
     const channel = message.mentions.channels.first() || message.guild.channels.cache.get(args[1]);
     const logType = args[2].toLowerCase();
-    // Usunięto możliwość ustawiania logów dla typu "change"
-    if (!channel || !['text', 'edit', 'voice'].includes(logType))
-      return message.reply('Podaj prawidłowy kanał oraz typ logów (text, edit, voice).');
+    if (!channel || !['text', 'edit', 'voice', 'change'].includes(logType))
+      return message.reply('Podaj prawidłowy kanał oraz typ logów (text, edit, voice, change).');
     setLogChannel(message.guild.id, channel.id, logType, (success) => {
       if (success) {
         message.reply(`Kanał logów typu **${logType}** został ustawiony na ${channel}.`);
@@ -510,8 +547,7 @@ client.on('roleCreate', async (role) => {
     .setColor('#2ecc71')
     .setDescription(`Nowa rola **${role.name}** została utworzona.\nKolor: ${role.hexColor}\nUprawnienia: ${role.permissions.toArray().join(', ') || 'Brak'}`)
     .setTimestamp();
-  // Usunięto wysyłanie logu zmian
-  sendTextLog(role.guild, { embeds: [embed] });
+  sendChangeLog(role.guild, embed);
 });
 
 client.on('roleDelete', async (role) => {
@@ -521,7 +557,7 @@ client.on('roleDelete', async (role) => {
     .setColor('#e74c3c')
     .setDescription(`Rola **${role.name}** została usunięta.`)
     .setTimestamp();
-  sendTextLog(role.guild, { embeds: [embed] });
+  sendChangeLog(role.guild, embed);
 });
 
 client.on('roleUpdate', async (oldRole, newRole) => {
@@ -549,7 +585,7 @@ client.on('roleUpdate', async (oldRole, newRole) => {
       .setColor('#3498db')
       .setDescription(changes.join('\n'))
       .setTimestamp();
-    sendTextLog(newRole.guild, { embeds: [embed] });
+    sendChangeLog(newRole.guild, embed);
   }
 });
 
@@ -560,7 +596,7 @@ client.on('channelCreate', async (channel) => {
     .setColor('#2ecc71')
     .setDescription(`Kanał **${channel.name}** został utworzony.`)
     .setTimestamp();
-  sendTextLog(channel.guild, { embeds: [embed] });
+  sendChangeLog(channel.guild, embed);
 });
 
 client.on('channelDelete', async (channel) => {
@@ -570,10 +606,9 @@ client.on('channelDelete', async (channel) => {
     .setColor('#e74c3c')
     .setDescription(`Kanał **${channel.name}** został usunięty.`)
     .setTimestamp();
-  sendTextLog(channel.guild, { embeds: [embed] });
+  sendChangeLog(channel.guild, embed);
 });
 
-// Rozbudowany event channelUpdate – usunięto wysyłanie logu zmian (sendChangeLog)
 client.on('channelUpdate', async (oldChannel, newChannel) => {
   if (!newChannel.guild) return;
   let changes = [];
@@ -582,7 +617,6 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
     changes.push(`Nazwa zmieniona z "${oldChannel.name}" na "${newChannel.name}"`);
   }
   
-  // Sprawdzamy właściwości specyficzne dla kanałów tekstowych
   if (newChannel.type === ChannelType.GuildText) {
     if (oldChannel.topic !== newChannel.topic) {
       changes.push(`Temat zmieniony z "${oldChannel.topic || 'Brak'}" na "${newChannel.topic || 'Brak'}"`);
@@ -636,14 +670,12 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
   
   if (changes.length > 0) {
     console.log("channelUpdate changes:", changes);
-    // Zamiast wysyłać log zmian, wysyłamy informację tekstową
-    sendTextLog(newChannel.guild, { embeds: [
-      new EmbedBuilder()
-        .setTitle('Zmiany w kanale')
-        .setColor('#3498db')
-        .setDescription(changes.join('\n'))
-        .setTimestamp()
-    ]});
+    sendChangeLog(newChannel.guild, new EmbedBuilder()
+      .setTitle('Zmiany w kanale')
+      .setColor('#3498db')
+      .setDescription(changes.join('\n'))
+      .setTimestamp()
+    );
   } else {
     console.log("channelUpdate: brak wykrytych zmian dla kanału", newChannel.name);
   }
