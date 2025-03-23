@@ -157,17 +157,22 @@ function sendVoiceLog(guild, embed) {
 
 function sendChangeLog(guild, embed) {
   getLogChannels(guild.id, (settings) => {
+    console.log("sendChangeLog settings:", settings);
     if (settings && settings.changeChannelId) {
       guild.channels
         .fetch(settings.changeChannelId)
         .then(channel => {
           if (channel && channel.isTextBased()) {
-            channel.send({ embeds: [embed] }).catch(err => console.error("Błąd przy wysyłaniu logu zmian:", err));
+            channel.send({ embeds: [embed] })
+              .then(() => console.log("Wysłano log zmian."))
+              .catch(err => console.error("Błąd przy wysyłaniu logu zmian:", err));
           } else {
             console.error("Kanał logów zmian nie został znaleziony lub nie jest tekstowy.");
           }
         })
         .catch(err => console.error("Błąd przy pobieraniu kanału logów zmian:", err));
+    } else {
+      console.error("Kanał logów zmian nie został ustawiony.");
     }
   });
 }
@@ -606,7 +611,7 @@ client.on('channelDelete', async (channel) => {
   sendChangeLog(channel.guild, embed);
 });
 
-// Poprawiony event channelUpdate z dodatkowymi sprawdzeniami (nazwa, temat, NSFW, uprawnienia)
+// Dodatkowo rozbudowany event channelUpdate z dodatkowymi sprawdzeniami (nazwa, temat, NSFW, uprawnienia)
 client.on('channelUpdate', async (oldChannel, newChannel) => {
   if (!newChannel.guild) return;
   let changes = [];
@@ -615,7 +620,7 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
     changes.push(`Nazwa zmieniona z "${oldChannel.name}" na "${newChannel.name}"`);
   }
   
-  // Dla kanałów tekstowych sprawdzamy temat i NSFW
+  // Sprawdzamy właściwości specyficzne dla kanałów tekstowych
   if (newChannel.type === ChannelType.GuildText) {
     if (oldChannel.topic !== newChannel.topic) {
       changes.push(`Temat zmieniony z "${oldChannel.topic || 'Brak'}" na "${newChannel.topic || 'Brak'}"`);
@@ -675,6 +680,8 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
       .setDescription(changes.join('\n'))
       .setTimestamp();
     sendChangeLog(newChannel.guild, embed);
+  } else {
+    console.log("channelUpdate: brak wykrytych zmian dla kanału", newChannel.name);
   }
 });
 
