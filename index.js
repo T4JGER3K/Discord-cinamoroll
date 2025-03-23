@@ -8,7 +8,6 @@ const {
 } = require('discord.js');
 const sqlite3 = require('sqlite3').verbose();
 
-// Inicjalizacja klienta – wymagane intencje dla wiadomości, reakcji, zdarzeń głosowych oraz zarządzania członkami
 const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
   intents: [
@@ -21,7 +20,6 @@ const client = new Client({
   ]
 });
 
-// Inicjalizacja bazy SQLite
 const db = new sqlite3.Database('./logChannels.db', (err) => {
   if (err) {
     console.error('Błąd połączenia z bazą danych:', err.message);
@@ -31,7 +29,6 @@ const db = new sqlite3.Database('./logChannels.db', (err) => {
   }
 });
 
-// Funkcja migracyjna – tworzymy tabele i dodajemy kolumnę changeChannelId, jeśli nie istnieje
 function initDatabase() {
   db.run(
     `CREATE TABLE IF NOT EXISTS logChannels (
@@ -77,10 +74,6 @@ function migrateLogChannels() {
   });
 }
 
-/**
- * Pobiera ustawienia kanałów logów dla danego serwera.
- * Zwraca obiekt { textChannelId, editChannelId, voiceChannelId, changeChannelId } lub null.
- */
 function getLogChannels(guildId, callback) {
   db.get(
     'SELECT textChannelId, editChannelId, voiceChannelId, changeChannelId FROM logChannels WHERE guildId = ?',
@@ -101,10 +94,6 @@ function getLogChannels(guildId, callback) {
   );
 }
 
-/**
- * Zapisuje ustawienia kanałów logów dla danego serwera.
- * logType: 'text', 'edit', 'voice' lub 'change'
- */
 function setLogChannel(guildId, channelId, logType, callback) {
   getLogChannels(guildId, (settings) => {
     let textId = settings ? settings.textChannelId : null;
@@ -616,11 +605,23 @@ client.on('channelDelete', async (channel) => {
   sendChangeLog(channel.guild, embed);
 });
 
+// Poprawiony event channelUpdate z dodatkowymi sprawdzeniami zmian (temat, NSFW, uprawnienia)
 client.on('channelUpdate', async (oldChannel, newChannel) => {
   if (!newChannel.guild) return;
   let changes = [];
+  
   if (oldChannel.name !== newChannel.name) {
     changes.push(`Nazwa zmieniona z "${oldChannel.name}" na "${newChannel.name}"`);
+  }
+  
+  // Dodane sprawdzenie zmiany tematu kanału
+  if (oldChannel.topic !== newChannel.topic) {
+    changes.push(`Temat zmieniony z "${oldChannel.topic || 'Brak'}" na "${newChannel.topic || 'Brak'}"`);
+  }
+  
+  // Dodane sprawdzenie zmiany ustawienia NSFW (jeśli dotyczy)
+  if (oldChannel.nsfw !== newChannel.nsfw) {
+    changes.push(`Ustawienie NSFW zmienione z "${oldChannel.nsfw}" na "${newChannel.nsfw}"`);
   }
   
   const oldOverwrites = oldChannel.permissionOverwrites.cache;
@@ -767,7 +768,6 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
   const member = newState.member || oldState.member;
   if (!member) return;
 
-  // Obsługa dołączania, opuszczania i przenoszenia między kanałami
   if (!oldState.channelId && newState.channelId) {
     const embed = new EmbedBuilder()
       .setTitle('Dołączenie do kanału')
@@ -804,7 +804,6 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     sendVoiceLog(oldState.guild, embed);
   }
 
-  // Obsługa mute/odciszenia (mute)
   if (newState.serverMute && !oldState.serverMute) {
     let executor = "Nieznany";
     try {
@@ -856,7 +855,6 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     sendVoiceLog(newState.guild, embed);
   }
 
-  // Obsługa deaf/odciszenia słuchu (deaf) – komunikat pojawi się tylko, gdy użytkownik był wcześniej wyciszony słuchowo
   if (newState.serverDeaf && !oldState.serverDeaf) {
     let executor = "Nieznany";
     try {
