@@ -343,7 +343,7 @@ client.on('messageCreate', async (message) => {
       .setFooter({ text: '© tajgerek' });
     return message.channel.send({ embeds: [opisEmbed] });
   }
-
+/*
   if (message.content === '!embed role') {
     if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator))
       return message.reply('Tylko administratorzy mogą używać tej komendy.');
@@ -383,6 +383,7 @@ client.on('messageCreate', async (message) => {
     }
     return;
   }
+    */
 
   if (message.content.startsWith('!embed')) {
     let args = message.content.slice('!embed'.length).trim();
@@ -445,18 +446,8 @@ client.on('messageCreate', async (message) => {
   }
 });
 
-const reactionRoleMap = {
-  "1350175816314650654": "1349830365761769532", 
-  "1350175814456709322": "1350176656631005184", 
-  "1350175817962881034": "1350633930730242178", 
-  "1350175812929720430": "1350633934047940719", 
-  "1350175819359715533": "1350633936903995472", 
-  "1350175808253329538": "1350633938661670953", 
-  "1350175811147141315": "1350633940079214665", 
-  "1350175809901559919": "1350633970684919921", 
-  "1350175806596321380": "1350634082186428436"  
-};
 
+/*
 client.on('messageReactionAdd', async (reaction, user) => {
   if (user.bot) return;
   if (reaction.partial) {
@@ -497,7 +488,7 @@ client.on('messageReactionAdd', async (reaction, user) => {
     }
   }
 });
-
+*/
 client.on('messageReactionRemove', async (reaction, user) => {
   if (user.bot) return;
   if (reaction.partial) {
